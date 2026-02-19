@@ -8,6 +8,7 @@ PRINT INFORMATION INTO TEMPORARY FILE
 #from __future__ import division
 
 import numpy as np
+import os
 from scipy import spatial
 from scipy.interpolate import splrep,splev
 from numpy.lib.recfunctions import append_fields
@@ -256,7 +257,6 @@ def write_nbody_file(p_list,p_header,param):
         exit()
 
 
-
 def read_halo_file(param):
 
     """
@@ -377,11 +377,11 @@ def read_halo_file(param):
         h_dt = np.dtype([('Mvir', '<f8'), ('x', '<f8'), ('y', '<f8'), ('z', '<f8'),
                          ('rvir', '<f8'), ('cvir', '<f8')])
         h = np.zeros(len(x), dtype=h_dt)
-        h['x'] = x/1000.0
-        h['y'] = y/1000.0
-        h['z'] = z/1000.0
+        h['x'] = x
+        h['y'] = y
+        h['z'] = z
         h['Mvir'] = Mvir
-        h['rvir'] = rvir/1000.0
+        h['rvir'] = rvir
         h['cvir'] = cvir
 
         print("Using param.sim.Mhalo_min to filter haloes.")
@@ -405,7 +405,9 @@ def read_halo_file(param):
     else:
         print('Unknown halo file format. Exit!')
         exit()
-
+    if param.code.return_bcmmass:
+        print('WARNING: param.code.return_bcmmass is True. Returning halo masses in h["Mvir_bcm"].')
+        h = append_fields(h, 'Mvir_bcm', np.zeros(len(h['Mvir'])))
     #build buffer
     rbuffer = param.code.rbuffer
     ID = np.where((h['x']>(Lbox-rbuffer)) & (h['x']<=Lbox))
@@ -448,6 +450,65 @@ def read_halo_file(param):
                               (h['z']>=(z_min-rbuffer)) & (h['z']<(z_max+rbuffer)))
                 h_list += [h[ID]]
     return h_list
+
+def write_halo_file(h_list, param):
+
+    """
+    Combine displaced halo chunks and write a halo catalog in HDF5 format.
+    """
+
+    try:
+        import h5py
+    except ImportError:
+        print('IOERROR: h5py is required to write halo output in HDF5 format.')
+        print('Install with: pip install h5py')
+        exit()
+
+    # Accept either a list of chunks or a single structured array.
+    if isinstance(h_list, (list, tuple)):
+        if len(h_list) == 0:
+            print('WARNING: Empty halo list. Writing empty halo catalog.')
+            h = np.zeros(
+                0,
+                dtype=[('Mvir', '<f8'), ('x', '<f8'), ('y', '<f8'), ('z', '<f8'),
+                       ('rvir', '<f8'), ('cvir', '<f8'), ('Mvir_bcm', '<f8')],
+            )
+        else:
+            h = np.concatenate(h_list)
+    else:
+        h = h_list
+
+    if (h.dtype.names is None):
+        print('IOERROR: Halo output must be a structured array.')
+        exit()
+
+    # Chunks overlap by a buffer; remove duplicate rows and keep first-seen order.
+    if len(h) > 0:
+        _, unique_idx = np.unique(h, return_index=True)
+        h = h[np.sort(unique_idx)]
+
+    halo_file_out = getattr(param.files, 'halofile_out', None)
+    if halo_file_out is None:
+        part_out = getattr(param.files, 'partfile_out', 'partfile_out.hdf5')
+        base, _ = os.path.splitext(part_out)
+        halo_file_out = base + '_halos.hdf5'
+        print('WARNING: param.files.halofile_out not set; using', halo_file_out)
+
+    if not (halo_file_out.endswith('.hdf5') or halo_file_out.endswith('.h5')):
+        base, _ = os.path.splitext(halo_file_out)
+        halo_file_out = base + '.hdf5'
+
+    try:
+        with h5py.File(halo_file_out, 'w') as f:
+            g_halo = f.create_group('halos')
+            for field in h.dtype.names:
+                g_halo.create_dataset(field, data=np.asarray(h[field]))
+    except OSError:
+        print('IOERROR: Cannot write HDF5 halo output file!')
+        print('Define par.files.halofile_out = "/path/to/output_halos.hdf5"')
+        exit()
+
+    print('Writing HDF5 halo output done! Nhalo =', len(h))
 
 
 
@@ -498,17 +559,19 @@ def displace(param):
     print('N_cpu = ',N_cpu)
 
     if (N_cpu == 1):
-        p_displ = [displace_chunk(p_list[0],h_list[0],p_header,param)]
+        ph_displ = [displace_chunk(p_list[0],h_list[0],p_header,param)]
 
     elif (N_cpu > 1):
         pool = schwimmbad.choose_pool(mpi=False, processes=N_cpu)
         tasks = list(zip(p_list,h_list,np.repeat(p_header,N_cpu),np.repeat(param,N_cpu)))
-        p_displ = pool.map(worker, tasks)
+        ph_displ = pool.map(worker, tasks)
         pool.close()
 
     #combine chunks and write output
+    p_displ = [p for p,h in ph_displ]
+    h_displ = [h for p,h in ph_displ]
     write_nbody_file(p_displ,p_header,param)
-
+    write_halo_file(h_displ,param)
 
 
 def worker(task):
@@ -576,6 +639,10 @@ def displace_chunk(p_chunk,h_chunk,p_header,param):
         frac, dens, mass = profiles(rbin,h_chunk['Mvir'][i],h_chunk['cvir'][i],cosmo_corr,cosmo_bias,param)
         DDMB = displ(rbin,mass['DMO'],mass['DMB'])
         DDMB_tck = splrep(rbin, DDMB,s=0,k=3)
+        if (param.code.return_bcmmass):
+            enc_dens_ov_rhocrit = mass['DMB'] / rhoc_of_z(param) / (4*np.pi/3.0*rbin**3)
+            M_deltaout = 10**np.interp(param.sim.deltavir, enc_dens_ov_rhocrit, np.log10(mass['DMB']), left=-np.inf, right=np.inf)
+            h_chunk['Mvir_bcm'][i] = M_deltaout
 
         #define minimum displacement
         smallestD = 0.01 #Mpc/h
@@ -617,4 +684,4 @@ def displace_chunk(p_chunk,h_chunk,p_header,param):
     p_chunk['y'] += Dp['y']
     p_chunk['z'] += Dp['z']
 
-    return p_chunk
+    return p_chunk, h_chunk
