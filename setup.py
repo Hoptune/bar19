@@ -8,11 +8,11 @@ def readme():
 
 baryonification_link = 'https://bitbucket.org/aurel..'
 
-setup(name='baryonification',
+setup(name='bar19',
       version='0.1',
       description='Correcting N-body outputs to account for baryon effects',
       url=baryonification_link,
       author='Aurel Schneider',
       author_email='schneider.duhem@gmail.com',
-      packages=['baryonification'],
+      packages=['bar19'],
       zip_safe=False)

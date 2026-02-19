@@ -37,19 +37,19 @@ def _legacy_chunk_particles(p, lbox, n_chunk):
 
 def _load_displ_module():
     repo_root = Path(__file__).resolve().parents[1]
-    displ_path = repo_root / "baryonification" / "displ.py"
+    displ_path = repo_root / "bar19" / "displ.py"
 
-    pkg = types.ModuleType("baryonification")
-    pkg.__path__ = [str(repo_root / "baryonification")]
-    sys.modules.setdefault("baryonification", pkg)
+    pkg = types.ModuleType("bar19")
+    pkg.__path__ = [str(repo_root / "bar19")]
+    sys.modules.setdefault("bar19", pkg)
 
     # Stub dependencies not needed by read_nbody_file in these tests.
-    sys.modules.setdefault("baryonification.profiles", types.ModuleType("baryonification.profiles"))
+    sys.modules.setdefault("bar19.profiles", types.ModuleType("bar19.profiles"))
     sys.modules.setdefault("schwimmbad", types.ModuleType("schwimmbad"))
 
-    spec = importlib.util.spec_from_file_location("baryonification.displ", displ_path)
+    spec = importlib.util.spec_from_file_location("bar19.displ", displ_path)
     mod = importlib.util.module_from_spec(spec)
-    sys.modules["baryonification.displ"] = mod
+    sys.modules["bar19.displ"] = mod
     assert spec.loader is not None
     spec.loader.exec_module(mod)
     return mod

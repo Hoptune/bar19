@@ -3,4 +3,4 @@ BARYONIFICATION
 
 To use (with caution), simply do::
 
-    >>> import baryonification as bfc
+    >>> import bar19 as bfc
