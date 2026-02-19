@@ -1,6 +1,7 @@
 """
 External Parameters
 """
+import numpy as np
 
 class Bunch(object):
     """
@@ -34,10 +35,10 @@ def baryon_par():
         "gamma": 2.0,     # index in gas profile [default: 2.0]
         "delta": 7.0,     # index in gas profile [default: 7.0 -> same asympt. behav. than NFWtrunc profile]  
         "rcga": 0.015,    # half-light radius of central galaxy (ratio to rvir)
-        "Nstar": 0.04,    # Stellar normalisation param [fstar = Nstar*(Mstar/Mvir)**eta]
-        "Mstar": 2.5e11,  # Stellar critical mass [fstar = Nstar*(Mstar/Mvir)**eta]
-        "eta": 0.32,      # exponent of total stellar fraction [fstar = Nstar*(Mstar/Mvir)**eta]
-        "deta": 0.28,     # exponent of central stellar fraction [fstar = Nstar*(Mstar/Mvir)**(eta+deta)]
+        "Nstar": 0.16,    # Stellar normalisation param [fstar = Nstar*(Mstar/Mvir)**eta], parameters from Moster+18, z=0.5
+        "Mstar": 10**(11.85+np.log10(.678)),  # Stellar critical mass [fstar = Nstar*(Mstar/Mvir)**eta]
+        "eta": .42,      # exponent of total stellar fraction [fstar = Nstar*(Mstar/Mvir)**eta]
+        "deta": 0.2,     # exponent of central stellar fraction [fstar = Nstar*(Mstar/Mvir)**(eta+deta)]
         }
     return Bunch(par)
 
@@ -45,12 +46,13 @@ def io_files():
     par = {
         "transfct": 'CDM_PLANCK_tk.dat',
         "cosmofct": 'cosmofct.dat',
-        "displfct": 'displfct.dat',
+        # "displfct": 'displfct.dat',
         "partfile_in": 'partfile_in.std',
         "partfile_out": 'partfile_out.std',
-        "partfile_format": 'tipsy',
+        "partfile_format": 'hdf5',
         "halofile_in": 'file_halo',
-        "halofile_format": 'AHF-ASCII',
+        "halofile_format": 'hdf5',
+        "halofile_out": 'file_halo',
     }
     return Bunch(par)
 
@@ -63,6 +65,7 @@ def code_par():
         "rbuffer": 10.0, # buffer size to take care of boundary conditions
         "eps": 4.0,      # truncation factor: eps=rtr/rvir 
         "beta_model": 0, # 0: old model from Schneider+18 1: new model
+        "return_bcmmass": True
         }
     return Bunch(par)
 

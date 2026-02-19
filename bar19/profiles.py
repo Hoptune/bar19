@@ -20,31 +20,31 @@ from .cosmo import *
 GENERAL FUNCTIONS REALTED TO THE NFW PROFILE
 """
 
-def r500_fct(r200,c):
+def r500_fct(rvir,c,deltavir):
     """
-    From r200 to r500 assuming a NFW profile
+    From r_delta to r500 assuming a NFW profile
     """
-    f = lambda y: np.log(1.0+c*y) - c*y/(1.0+c*y) - 5.0/2.0*(np.log(1.0+c)-c/(1.0+c))*y**3.0
+    f = lambda y: np.log(1.0+c*y) - c*y/(1.0+c*y) - 500./deltavir*(np.log(1.0+c)-c/(1.0+c))*y**3.0
     y0 = fsolve(f,1.0)
-    return y0*r200
+    return y0*rvir
 
 
-def rvir_fct(r200,c):
+def rvir_fct(rvir,c,deltavir):
     """
-    From r500 to r200 assuming a NFW profile
+    From r_delta to rvir (delta=96) assuming a NFW profile
     """
-    f = lambda y: np.log(1.0+c*y) - c*y/(1.0+c*y) - 96.0/200.0*(np.log(1.0+c)-c/(1.0+c))*y**3.0
+    f = lambda y: np.log(1.0+c*y) - c*y/(1.0+c*y) - 96.0/deltavir*(np.log(1.0+c)-c/(1.0+c))*y**3.0
     y0 = fsolve(f,1.0)
-    return y0*r200
+    return y0*rvir
 
 
-def M500_fct(M200,c):
+def M500_fct(Mvir,c,deltavir):
     """
     From M200 to M500 assuming a NFW profiles
     """
-    f = lambda y: np.log(1.0+c*y) - c*y/(1.0+c*y) - 5.0/2.0*(np.log(1.0+c)-c/(1.0+c))*y**3.0
+    f = lambda y: np.log(1.0+c*y) - c*y/(1.0+c*y) - 500./deltavir*(np.log(1.0+c)-c/(1.0+c))*y**3.0
     y0 = fsolve(f,1.0)
-    return 5.0/2.0*M200*y0**3.0
+    return 500./deltavir*Mvir*y0**3.0
 
 
 #def cvir_fct(mvir,param):
