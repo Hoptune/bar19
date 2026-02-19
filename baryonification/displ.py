@@ -61,7 +61,7 @@ def read_nbody_file(param):
 
         print('Reading tipsy-file done!')
 
-    elif (nbody_file_format=='huang_npy'):
+    elif (nbody_file_format=='npy'):
 
         try:
             p = np.load(nbody_file_in)
@@ -73,11 +73,44 @@ def read_nbody_file(param):
         #header (placeholder)
         p_header = {'a': 1.0, 'npart': 1, 'ndim': 3, 'ng': 0, 'nd': 1, 'ns': 0,'buffer': 0}
 
-        #particles
-        p_dt = np.dtype([("x",'>f'),("y",'>f'),("z",'>f')])
-        p.astype(p_dt)
+        #require structured arrays containing x/y/z fields
+        if (p.dtype.names is None) or any(name not in p.dtype.names for name in ("x", "y", "z")):
+            print('IOERROR: npy particle catalog must be a structured array with x/y/z fields.')
+            exit()
 
         print('Reading npy-file done!')
+
+    elif (nbody_file_format=='hdf5' or nbody_file_format=='catalog-hdf5'):
+
+        try:
+            import h5py
+        except ImportError:
+            print('IOERROR: h5py is required for partfile_format=hdf5.')
+            print('Install with: pip install h5py')
+            exit()
+
+        try:
+            with h5py.File(nbody_file_in, 'r') as f:
+                g = f['dm'] if 'dm' in f else f
+                x = np.asarray(g['x'], dtype=np.float32)
+                y = np.asarray(g['y'], dtype=np.float32)
+                z = np.asarray(g['z'], dtype=np.float32)
+        except (OSError, KeyError):
+            print('IOERROR: Cannot read HDF5 catalog with required x/y/z datasets.')
+            print('Define par.files.partfile_in = "/path/to/catalog.hdf5"')
+            exit()
+
+        if (len(x) != len(y)) or (len(x) != len(z)):
+            print('IOERROR: x, y, z must have identical lengths.')
+            exit()
+
+        p_header = {'a': 1.0, 'npart': len(x), 'ndim': 3, 'ng': 0, 'nd': len(x), 'ns': 0, 'buffer': 0}
+        p_dt = np.dtype([('x','>f'),('y','>f'),('z','>f')])
+        p = np.zeros(len(x), dtype=p_dt)
+        p['x'] = np.mod(x, Lbox)
+        p['y'] = np.mod(y, Lbox)
+        p['z'] = np.mod(z, Lbox)
+        print('Reading user-supplied HDF5 catalog done!')
 
     elif (nbody_file_format=='gadget'):
 
@@ -88,28 +121,50 @@ def read_nbody_file(param):
         print('Unknown file format. Exit!')
         exit()
 
-    #split in chunks
-    p_list = []
-    for x_min in np.linspace(0,Lbox-L_chunk,N_chunk):
-        x_max = x_min + L_chunk
-        if (x_max == Lbox):
-            x_max = 1.00001*x_max
-        for y_min in np.linspace(0,Lbox-L_chunk,N_chunk):
-            y_max =y_min + L_chunk
-            if (y_max == Lbox):
-                    y_max = 1.00001*y_max
-            for z_min in np.linspace(0,Lbox-L_chunk,N_chunk):
-                z_max = z_min + L_chunk
-                if (z_max == Lbox):
-                        z_max = 1.00001*z_max
-                ID = np.where((p['x']>=x_min) & (p['x']<x_max) & (p['y']>=y_min) & (p['y']<y_max) & (p['z']>=z_min) & (p['z']<z_max))
-                p_list += [p[ID]]
+    # Fast chunking in O(N) assignment + grouping by chunk ID.
+    n_total_chunks = int(N_chunk**3)
+    x = np.asarray(p['x'])
+    y = np.asarray(p['y'])
+    z = np.asarray(p['z'])
 
-    #check if number of particles is still the same 
-    pl = 0
-    for pp in p_list:
-        pl += len(pp)
-    if (pl != len(p)):
+    # Match legacy behavior: keep only coordinates in [0, 1.00001*Lbox),
+    # where x==Lbox/y==Lbox/z==Lbox are assigned to the last chunk.
+    upper = 1.00001 * Lbox
+    valid = (x >= 0.0) & (x < upper) & (y >= 0.0) & (y < upper) & (z >= 0.0) & (z < upper)
+
+    p_list = [None] * n_total_chunks
+    for i in range(n_total_chunks):
+        p_list[i] = p[:0]
+
+    particles_assigned = int(np.sum(valid))
+    if particles_assigned > 0:
+        xv = x[valid]
+        yv = y[valid]
+        zv = z[valid]
+
+        ix = np.floor(xv / L_chunk).astype(np.int64)
+        iy = np.floor(yv / L_chunk).astype(np.int64)
+        iz = np.floor(zv / L_chunk).astype(np.int64)
+        ix = np.clip(ix, 0, N_chunk - 1)
+        iy = np.clip(iy, 0, N_chunk - 1)
+        iz = np.clip(iz, 0, N_chunk - 1)
+
+        flat_chunk_id = ((ix * N_chunk) + iy) * N_chunk + iz
+        valid_idx = np.nonzero(valid)[0]
+        order = np.argsort(flat_chunk_id, kind='stable')
+        sorted_particle_idx = valid_idx[order]
+
+        counts = np.bincount(flat_chunk_id, minlength=n_total_chunks)
+        starts = np.empty(n_total_chunks + 1, dtype=np.int64)
+        starts[0] = 0
+        starts[1:] = np.cumsum(counts, dtype=np.int64)
+
+        for chunk_id in range(n_total_chunks):
+            i0 = int(starts[chunk_id])
+            i1 = int(starts[chunk_id + 1])
+            p_list[chunk_id] = p[sorted_particle_idx[i0:i1]]
+
+    if (particles_assigned != len(p)):
         print('Chunking: particle number not conserved! Exit.')
         exit()
     return p_list, p_header
@@ -163,13 +218,34 @@ def write_nbody_file(p_list,p_header,param):
         p_header.tofile(f,sep='')
         p.tofile(f,sep='')
 
-    elif (nbody_file_format=='huang_npy'):
+    elif (nbody_file_format=='npy'):
         try:
             np.save(nbody_file_out,p)
         except IOError:
             print('IOERROR: Path to output file does not exist!')
             print('Define par.files.partfile_out = "/path/to/file"')
             exit()
+
+    elif (nbody_file_format=='hdf5' or nbody_file_format=='catalog-hdf5'):
+        try:
+            import h5py
+        except ImportError:
+            print('IOERROR: h5py is required for partfile_format=hdf5.')
+            print('Install with: pip install h5py')
+            exit()
+
+        try:
+            with h5py.File(nbody_file_out, 'w') as f:
+                g_dm = f.create_group('dm')
+                g_dm.create_dataset('x', data=p['x'].astype(np.float32))
+                g_dm.create_dataset('y', data=p['y'].astype(np.float32))
+                g_dm.create_dataset('z', data=p['z'].astype(np.float32))
+        except OSError:
+            print('IOERROR: Cannot write HDF5 catalog output file!')
+            print('Define par.files.partfile_out = "/path/to/output.hdf5"')
+            exit()
+
+        print('Writing HDF5 catalog output done!')
 
     elif (nbody_file_format=='gadget'):
         print('Writing gadget files not implemented. Exit!')
@@ -483,5 +559,3 @@ def displace_chunk(p_chunk,h_chunk,p_header,param):
     p_chunk['z'] += Dp['z']
 
     return p_chunk
-
-

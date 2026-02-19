@@ -28,6 +28,35 @@ def read_nbody_file(param):
     nbody_file_in = param.files.partfile_in
     nbody_file_format = param.files.partfile_format
     Lbox = param.sim.Lbox
+    if (nbody_file_format=='hdf5' or nbody_file_format=='catalog-hdf5'):
+        try:
+            import h5py
+        except ImportError:
+            print('IOERROR: h5py is required for partfile_format=hdf5.')
+            print('Install with: pip install h5py')
+            exit()
+        try:
+            with h5py.File(nbody_file_in, 'r') as f:
+                g = f['dm'] if 'dm' in f else f
+                x = np.asarray(g['x'], dtype=np.float32)
+                y = np.asarray(g['y'], dtype=np.float32)
+                z = np.asarray(g['z'], dtype=np.float32)
+        except (OSError, KeyError):
+            print('IOERROR: Cannot read HDF5 catalog with required x/y/z datasets.')
+            print('Define par.files.partfile_in = "/path/to/catalog.hdf5"')
+            exit()
+        if (len(x) != len(y)) or (len(x) != len(z)):
+            print('IOERROR: x, y, z must have identical lengths.')
+            exit()
+        p_header = {'a': 1.0, 'npart': len(x), 'ndim': 3, 'ng': 0, 'nd': len(x), 'ns': 0, 'buffer': 0}
+        p_dt = np.dtype([('x','>f'),('y','>f'),('z','>f')])
+        p = np.zeros(len(x), dtype=p_dt)
+        p['x'] = np.mod(x, Lbox)
+        p['y'] = np.mod(y, Lbox)
+        p['z'] = np.mod(z, Lbox)
+        print('Reading user-supplied HDF5 catalog done!')
+        return p, p_header
+
     try:
         f = open(nbody_file_in, 'r')
     except IOError:
@@ -63,6 +92,26 @@ def write_nbody_file(p,p_header,param):
     nbody_file_out = param.files.partfile_out
     nbody_file_format = param.files.partfile_format
     Lbox = param.sim.Lbox
+    if (nbody_file_format=='hdf5' or nbody_file_format=='catalog-hdf5'):
+        try:
+            import h5py
+        except ImportError:
+            print('IOERROR: h5py is required for partfile_format=hdf5.')
+            print('Install with: pip install h5py')
+            exit()
+        try:
+            with h5py.File(nbody_file_out, 'w') as f:
+                g_dm = f.create_group('dm')
+                g_dm.create_dataset('x', data=p['x'].astype(np.float32))
+                g_dm.create_dataset('y', data=p['y'].astype(np.float32))
+                g_dm.create_dataset('z', data=p['z'].astype(np.float32))
+        except OSError:
+            print('IOERROR: Cannot write HDF5 catalog output file!')
+            print('Define par.files.partfile_out = "/path/to/output.hdf5"')
+            exit()
+        print('Writing HDF5 catalog output done!')
+        return
+
     try:
         f = open(nbody_file_out, 'wb')
     except IOError:
