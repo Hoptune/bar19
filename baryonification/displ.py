@@ -263,14 +263,14 @@ def read_halo_file(param):
     Only supports AHF-file format for the moment
     Read in halo file, adopt units, build buffer around 
     chunks (for multi-processor mode)
-    Select for hosts with more than 100 particles.
+    Select for hosts above a minimum halo mass.
     Restricted to AHF for the moment.
     """
 
     #read files 
     halo_file_in = param.files.halofile_in
     halo_file_format = param.files.halofile_format
-    Nmin = param.sim.Nmin_per_halo
+    Mhalo_min = param.sim.Mhalo_min
     Lbox = param.sim.Lbox
 
     if (halo_file_format=='AHF-ASCII'):
@@ -288,8 +288,8 @@ def read_halo_file(param):
         h['z']    = h['z']/1000.0
         h['rvir'] = h['rvir']/1000.0
 
-        #select haloes with Npart>Nmin
-        gID  = np.where(h['Nvir'] >= Nmin)
+        #select haloes above minimum mass
+        gID  = np.where(h['Mvir'] >= Mhalo_min)
         h = h[gID]
         #select haloes with reasonable concentration
         gID  = np.where(h['cvir'] > 0)
@@ -323,8 +323,7 @@ def read_halo_file(param):
         h = np.array(h,dtype=h_dt)
         h = append_fields(h, 'cvir', h['rvir']/h['rs_hlist'])
 
-        print("WARNING: param.sim.Nmin_per_halo is not used.")
-        print("Dispalcement applied to all haloes.")
+        print("Using param.sim.Mhalo_min to filter haloes.")
 
         #select haloes with reasonable concentration
         gID  = np.where(np.isfinite(h['cvir']))
@@ -333,8 +332,8 @@ def read_halo_file(param):
         gID  = np.where(h['upid'] < 0.0)
         h = h[gID]
 
-        #select haloes with Mvir>2.5e11
-        gID  = np.where(h['Mvir'] >2.5e11)
+        #select haloes above minimum mass
+        gID  = np.where(h['Mvir'] >= Mhalo_min)
         h = h[gID]
 
         print('Nhalo = ',len(h['Mvir']))
@@ -343,6 +342,66 @@ def read_halo_file(param):
         h['rvir'] = h['rvir']/1000
         h['rs_hlist'] = h['rs_hlist']/1000
         
+    elif (halo_file_format=='hdf5' or halo_file_format=='halo-hdf5' or halo_file_format=='catalog-hdf5'):
+        try:
+            import h5py
+        except ImportError:
+            print('IOERROR: h5py is required for halofile_format=hdf5.')
+            print('Install with: pip install h5py')
+            exit()
+
+        try:
+            with h5py.File(halo_file_in, 'r') as f:
+                g = f['halos'] if 'halos' in f else f
+                x = np.asarray(g['x'])
+                y = np.asarray(g['y'])
+                z = np.asarray(g['z'])
+                Mvir = np.asarray(g['Mvir'])
+                rvir = np.asarray(g['rvir'])
+                cvir = np.asarray(g['cvir'])
+                if 'IDhost' in g:
+                    host_id = np.asarray(g['IDhost'])
+                elif 'upid' in g:
+                    host_id = np.asarray(g['upid'])
+                else:
+                    host_id = None
+        except (OSError, KeyError):
+            print('IOERROR: Cannot read HDF5 halo catalog with required datasets.')
+            print('Define par.files.halofile_in = "/path/to/halos.hdf5"')
+            exit()
+
+        if any(len(arr) != len(x) for arr in (y, z, Mvir, rvir, cvir)):
+            print('IOERROR: HDF5 halo datasets must have identical lengths.')
+            exit()
+
+        h_dt = np.dtype([('Mvir', '<f8'), ('x', '<f8'), ('y', '<f8'), ('z', '<f8'),
+                         ('rvir', '<f8'), ('cvir', '<f8')])
+        h = np.zeros(len(x), dtype=h_dt)
+        h['x'] = x/1000.0
+        h['y'] = y/1000.0
+        h['z'] = z/1000.0
+        h['Mvir'] = Mvir
+        h['rvir'] = rvir/1000.0
+        h['cvir'] = cvir
+
+        print("Using param.sim.Mhalo_min to filter haloes.")
+
+        #select haloes above minimum mass
+        gID  = np.where(h['Mvir'] >= Mhalo_min)
+        h = h[gID]
+        #select haloes with reasonable concentration
+        gID  = np.where(h['cvir'] > 0)
+        h = h[gID]
+        #select main haloes when a host id is provided
+        if host_id is not None:
+            host_id = host_id[gID]
+            gID  = np.where(host_id < 0.0)
+            h = h[gID]
+        else:
+            print('WARNING: HDF5 halo catalog has no IDhost/upid. Keeping all haloes.')
+
+        print('Nhalo = ',len(h['Mvir']))
+
     else:
         print('Unknown halo file format. Exit!')
         exit()

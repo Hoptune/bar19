@@ -70,8 +70,9 @@ def sim_par():
     par = {
         "Lbox": 128.0,   #box size of partfile_in
         "rbuffer": 10.0, #buffer size to take care of boundary conditions
-        "Nmin_per_halo": 100,
-        "N_chunk": 1      #number of chunks (for multiprocesser: n_core = N_chunk^3)
+        "Mhalo_min": 2.5e11, # minimum halo mass
+        "N_chunk": 1,     #number of chunks (for multiprocesser: n_core = N_chunk^3)
+        "deltavir": 200.0, # overdensity relative to critical density
         }
     return Bunch(par)
 

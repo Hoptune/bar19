@@ -12,6 +12,3 @@ RHOC = 2.776e11
 """ Newtons constant in [Mpc/Msun*(km/s)^2] """
 G = 4.299e-9
 
-""" Deltavir overdensity criterion """
-DELTAVIR = 200.0
-

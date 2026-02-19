@@ -92,7 +92,7 @@ def uNFWtr_fct(rbin,cvir,t,Mvir,param):
     Truncated NFW density profile. Normalised.
     """
 
-    rvir = (3.0*Mvir/(4.0*np.pi*DELTAVIR*rhoc_of_z(param)))**(1.0/3.0)
+    rvir = (3.0*Mvir/(4.0*np.pi*param.sim.deltavir*rhoc_of_z(param)))**(1.0/3.0)
     x = cvir*rbin/rvir
     return 1.0/(x * (1.0+x)**2.0 * (1.0+x**2.0/t**2.0)**2.0)
 
@@ -101,8 +101,8 @@ def rhoNFW_fct(rbin,cvir,Mvir,param):
     """
     NFW density profile.
     """
-    rvir = (3.0*Mvir/(4.0*np.pi*DELTAVIR*rhoc_of_z(param)))**(1.0/3.0)
-    rho0 = DELTAVIR*rhoc_of_z(param)*cvir**3.0/(3.0*np.log(1.0+cvir)-3.0*cvir/(1.0+cvir))
+    rvir = (3.0*Mvir/(4.0*np.pi*param.sim.deltavir*rhoc_of_z(param)))**(1.0/3.0)
+    rho0 = param.sim.deltavir*rhoc_of_z(param)*cvir**3.0/(3.0*np.log(1.0+cvir)-3.0*cvir/(1.0+cvir))
     x = cvir*rbin/rvir
     return rho0/(x * (1.0+x)**2.0)
 
@@ -139,7 +139,7 @@ def MNFWtr_fct(rbin,cvir,t,Mvir,param):
     Truncateed NFW mass profile.
     """
     
-    rvir = (3.0*Mvir/(4.0*np.pi*DELTAVIR*rhoc_of_z(param)))**(1.0/3.0)
+    rvir = (3.0*Mvir/(4.0*np.pi*param.sim.deltavir*rhoc_of_z(param)))**(1.0/3.0)
     return Mvir*mNFWtr_fct(cvir*rbin/rvir,t)/mNFWtr_fct(cvir,t)
 
 
@@ -147,7 +147,7 @@ def MNFW_fct(rbin,cvir,Mvir,param):
     """
     NFW mass profile
     """
-    rvir = (3.0*Mvir/(4.0*np.pi*DELTAVIR*rhoc_of_z(param)))**(1.0/3.0)
+    rvir = (3.0*Mvir/(4.0*np.pi*param.sim.deltavir*rhoc_of_z(param)))**(1.0/3.0)
     x = cvir*rbin/rvir
     return (np.log(1.0+x) - x/(1.0+x))/(np.log(1.0+cvir)-cvir/(1.0+cvir))*Mvir
 
@@ -198,7 +198,7 @@ def uHGA_fct(rbin,Mvir,param):
     ga   = param.baryon.gamma
     de   = param.baryon.delta 
     
-    rvir = (3.0*Mvir/(4.0*np.pi*DELTAVIR*rhoc_of_z(param)))**(1.0/3.0)
+    rvir = (3.0*Mvir/(4.0*np.pi*param.sim.deltavir*rhoc_of_z(param)))**(1.0/3.0)
     rco  = thco*rvir
     rej  = thej*rvir
     
@@ -215,7 +215,7 @@ def uCGA_fct(rbin,Mvir,param):
     """
     Normalised density profile of central galaxy
     """
-    rvir = (3.0*Mvir/(4.0*np.pi*DELTAVIR*rhoc_of_z(param)))**(1.0/3.0)
+    rvir = (3.0*Mvir/(4.0*np.pi*param.sim.deltavir*rhoc_of_z(param)))**(1.0/3.0)
     R12 = param.baryon.rcga*rvir
     return np.exp(-(rbin/R12/2.0)**2.0)/rbin**2.0
 
@@ -225,7 +225,7 @@ def MCGA_fct(rbin,Mvir,param):
     Normalised mass profile of central galaxy
     (needs to be multiplied with Mtot)
     """
-    rvir = (3.0*Mvir/(4.0*np.pi*DELTAVIR*rhoc_of_z(param)))**(1.0/3.0)
+    rvir = (3.0*Mvir/(4.0*np.pi*param.sim.deltavir*rhoc_of_z(param)))**(1.0/3.0)
     R12 = param.baryon.rcga*rvir
     return erf(rbin/R12/2.0)
 
@@ -249,7 +249,7 @@ def profiles(rbin,Mvir,cvir,cosmo_corr,cosmo_bias,param):
     
     #radii
     tau  = eps*cvir
-    rvir = (3.0*Mvir/(4.0*np.pi*DELTAVIR*rhoc_of_z(param)))**(1.0/3.0)
+    rvir = (3.0*Mvir/(4.0*np.pi*param.sim.deltavir*rhoc_of_z(param)))**(1.0/3.0)
     r500 = r500_fct(rvir,cvir)
     M500 = MNFW_fct(r500,cvir,Mvir,param)
     #M500 = MNFWtr_fct(r500,cvir,tau,Mvir,param)
@@ -269,7 +269,7 @@ def profiles(rbin,Mvir,cvir,cosmo_corr,cosmo_bias,param):
     Mtot = Mvir*mTOTtr_fct(tau)/mNFWtr_fct(cvir,tau)
 
     #Initial density and mass profiles
-    rho0NFWtr = DELTAVIR*rhoc_of_z(param)*cvir**3.0/(3.0*mNFWtr_fct(cvir,tau))
+    rho0NFWtr = param.sim.deltavir*rhoc_of_z(param)*cvir**3.0/(3.0*mNFWtr_fct(cvir,tau))
     rhoNFW = rho0NFWtr*uNFWtr_fct(rbin,cvir,tau,Mvir,param)
     rho2h = (cosmo_bias*cosmo_corr + 1.0)*Om*RHOC #rho_b=const in comoving coord.
     rhoDMO = rhoNFW + rho2h
