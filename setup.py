@@ -14,5 +14,8 @@ setup(name='bar19',
       url=baryonification_link,
       author='Aurel Schneider',
       author_email='schneider.duhem@gmail.com',
+      install_requires=[
+          'schwimmbad',
+      ],
       packages=['bar19'],
       zip_safe=False)

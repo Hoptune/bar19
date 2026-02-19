@@ -8,7 +8,11 @@ PROFILES AND FRACTIONS FOR BARIONIC CORRECTIONS
 
 import numpy as np
 from scipy.special import erf
-from scipy.integrate import simps, cumtrapz
+try:
+    from scipy.integrate import simpson, cumulative_trapezoid
+except ImportError:
+    # Backward compatibility with older SciPy releases
+    from scipy.integrate import simps as simpson, cumtrapz as cumulative_trapezoid
 from scipy.optimize import fsolve
 from scipy.interpolate import splrep,splev
 from .constants import *
@@ -274,17 +278,17 @@ def profiles(rbin,Mvir,cvir,cosmo_corr,cosmo_bias,param):
     rho2h = (cosmo_bias*cosmo_corr + 1.0)*Om*RHOC #rho_b=const in comoving coord.
     rhoDMO = rhoNFW + rho2h
     MNFW   = MNFWtr_fct(rbin,cvir,tau,Mvir,param)
-    M2h    = cumtrapz(4.0*np.pi*rbin**2.0*rho2h,rbin,initial=rbin[0])
+    M2h    = cumulative_trapezoid(4.0*np.pi*rbin**2.0*rho2h,rbin,initial=rbin[0])
     MDMO   = MNFW + M2h
 
     #Final density and mass profiles
     uHGA =  uHGA_fct(rbin,Mvir,param)
-    rho0HGA = Mtot/(4.0*np.pi*simps(rbin**2.0*uHGA,rbin))
+    rho0HGA = Mtot/(4.0*np.pi*simpson(rbin**2.0*uHGA,rbin))
     rhoHGA   = rho0HGA*uHGA
     R12      = param.baryon.rcga*rvir
     rho0CGA  = Mtot/(4.0*np.pi**(3.0/2.0)*R12)
     rhoCGA   = rho0CGA*uCGA_fct(rbin,Mvir,param)
-    MHGA     = cumtrapz(4.0*np.pi*rbin**2.0*rhoHGA,rbin,initial=rbin[0]) + M2h
+    MHGA     = cumulative_trapezoid(4.0*np.pi*rbin**2.0*rhoHGA,rbin,initial=rbin[0]) + M2h
     MCGA     = Mtot*MCGA_fct(rbin,Mvir,param) + M2h
     MHGA_tck = splrep(rbin, MHGA, s=0, k=3)
     MCGA_tck = splrep(rbin, MCGA, s=0, k=3)
@@ -320,4 +324,3 @@ def profiles(rbin,Mvir,cvir,cosmo_corr,cosmo_bias,param):
     dens = { 'NFW':rhoNFW, 'BG':rho2h, 'DMO':rhoDMO, 'ACM':rhoACM, 'CGA':rhoCGA, 'HGA':rhoHGA, 'DMB':rhoDMB }
     mass = { 'NFW':MNFW, 'BG':M2h, 'DMO':MDMO, 'ACM':(fcdm+fsga)*MACM, 'CGA':fcga*MCGA, 'HGA':fhga*MHGA, 'DMB':MDMB }
     return frac, dens, mass
-
