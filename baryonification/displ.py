@@ -1,0 +1,487 @@
+"""
+CALCULATE DISPLACEMENT FUNCTION FOR A GRID OF M AND C
+PRINT INFORMATION INTO TEMPORARY FILE
+
+"""
+
+#from __future__ import print_function
+#from __future__ import division
+
+import numpy as np
+from scipy import spatial
+from scipy.interpolate import splrep,splev
+from numpy.lib.recfunctions import append_fields
+
+import schwimmbad
+
+#from .params import par
+from .constants import *
+from .profiles import *
+
+"""
+READING/WRITING FILES
+"""
+
+def read_nbody_file(param):
+
+    """
+    Read in N-body output, adopt units, and build chunks 
+    (for multi-processor mode)
+    Only supports tispy file format for the moment
+    """
+
+    nbody_file_in = param.files.partfile_in
+    nbody_file_format = param.files.partfile_format
+    Lbox   = param.sim.Lbox
+    N_chunk = param.sim.N_chunk
+    L_chunk = Lbox/N_chunk
+
+    #read in file
+    if (nbody_file_format=='tipsy'):
+
+        try:
+            f = open(nbody_file_in, 'r')
+        except IOError:
+            print('IOERROR: N-body tipsy file does not exist!')
+            print('Define par.files.partfile_in = "/path/to/file"')
+            exit()
+
+        #header
+        p_header_dt = np.dtype([('a','>d'),('npart','>i'),('ndim','>i'),('ng','>i'),('nd','>i'),('ns','>i'),('buffer','>i')])
+        p_header = np.fromfile(f, dtype=p_header_dt, count=1, sep='')
+
+        #particles
+        p_dt = np.dtype([('mass','>f'),("x",'>f'),("y",'>f'),("z",'>f'),("vx",'>f'),("vy",'>f'),("vz",'>f'),("eps",'>f'),("phi",'>f')])
+        p = np.fromfile(f, dtype=p_dt, count=int(p_header['npart']), sep='')
+
+        #from tipsy units to [0,Lbox] in units of Lbox
+        p['x']=Lbox*(p['x']+0.5)
+        p['y']=Lbox*(p['y']+0.5)
+        p['z']=Lbox*(p['z']+0.5)
+
+        print('Reading tipsy-file done!')
+
+    elif (nbody_file_format=='huang_npy'):
+
+        try:
+            p = np.load(nbody_file_in)
+        except IOError:
+            print('IOERROR: N-body npy file does not exist!')
+            print('Define par.files.partfile_in = "/path/to/file"')
+            exit()
+
+        #header (placeholder)
+        p_header = {'a': 1.0, 'npart': 1, 'ndim': 3, 'ng': 0, 'nd': 1, 'ns': 0,'buffer': 0}
+
+        #particles
+        p_dt = np.dtype([("x",'>f'),("y",'>f'),("z",'>f')])
+        p.astype(p_dt)
+
+        print('Reading npy-file done!')
+
+    elif (nbody_file_format=='gadget'):
+
+        print('Reading gadget files not implemented. Exit!')
+        exit()
+
+    else:
+        print('Unknown file format. Exit!')
+        exit()
+
+    #split in chunks
+    p_list = []
+    for x_min in np.linspace(0,Lbox-L_chunk,N_chunk):
+        x_max = x_min + L_chunk
+        if (x_max == Lbox):
+            x_max = 1.00001*x_max
+        for y_min in np.linspace(0,Lbox-L_chunk,N_chunk):
+            y_max =y_min + L_chunk
+            if (y_max == Lbox):
+                    y_max = 1.00001*y_max
+            for z_min in np.linspace(0,Lbox-L_chunk,N_chunk):
+                z_max = z_min + L_chunk
+                if (z_max == Lbox):
+                        z_max = 1.00001*z_max
+                ID = np.where((p['x']>=x_min) & (p['x']<x_max) & (p['y']>=y_min) & (p['y']<y_max) & (p['z']>=z_min) & (p['z']<z_max))
+                p_list += [p[ID]]
+
+    #check if number of particles is still the same 
+    pl = 0
+    for pp in p_list:
+        pl += len(pp)
+    if (pl != len(p)):
+        print('Chunking: particle number not conserved! Exit.')
+        exit()
+    return p_list, p_header
+
+
+
+def write_nbody_file(p_list,p_header,param):
+
+    """
+    Combine chunks and write N-body outputs with displaced 
+    particles. Only tipsy file format for the moment.
+    p_list = list of p with legth = Nchunk 
+    """
+
+    nbody_file_out = param.files.partfile_out
+    nbody_file_format = param.files.partfile_format
+    Lbox = param.sim.Lbox
+    N_chunk = param.sim.N_chunk
+
+    #combine chunks
+    #if (N_chunk > 1):
+    #    p = np.concatenate(p_list)
+    #else:
+    #    p = p_list
+
+    p = np.concatenate(p_list)
+    #print(type(p))
+    #print(p['x'][0])
+    #correct for periodic boundaries
+    p['x'][p['x']>Lbox] -= Lbox
+    p['x'][p['x']<0.0]  += Lbox
+    p['y'][p['y']>Lbox] -= Lbox
+    p['y'][p['y']<0.0]  += Lbox
+    p['z'][p['z']>Lbox] -= Lbox
+    p['z'][p['z']<0.0]  += Lbox
+
+    #write output
+    if (nbody_file_format=='tipsy'):
+
+        try:
+            f = open(nbody_file_out, 'wb')
+        except IOError:
+            print('IOERROR: Path to output file does not exist!')
+            print('Define par.files.partfile_out = "/path/to/file"')
+            exit()
+
+        #back to tipsy units
+        p['x']=(p['x']/Lbox-0.5).astype(np.float32)
+        p['y']=(p['y']/Lbox-0.5).astype(np.float32)
+        p['z']=(p['z']/Lbox-0.5).astype(np.float32)
+        p_header.tofile(f,sep='')
+        p.tofile(f,sep='')
+
+    elif (nbody_file_format=='huang_npy'):
+        try:
+            np.save(nbody_file_out,p)
+        except IOError:
+            print('IOERROR: Path to output file does not exist!')
+            print('Define par.files.partfile_out = "/path/to/file"')
+            exit()
+
+    elif (nbody_file_format=='gadget'):
+        print('Writing gadget files not implemented. Exit!')
+        exit()
+
+    else:
+        print('Unknown file format. Exit!')
+        exit()
+
+
+
+def read_halo_file(param):
+
+    """
+    Only supports AHF-file format for the moment
+    Read in halo file, adopt units, build buffer around 
+    chunks (for multi-processor mode)
+    Select for hosts with more than 100 particles.
+    Restricted to AHF for the moment.
+    """
+
+    #read files 
+    halo_file_in = param.files.halofile_in
+    halo_file_format = param.files.halofile_format
+    Nmin = param.sim.Nmin_per_halo
+    Lbox = param.sim.Lbox
+
+    if (halo_file_format=='AHF-ASCII'):
+        try:
+            names = "ID,IDhost,Mvir,Nvir,x,y,z,rvir,cvir"
+            h = np.genfromtxt(halo_file_in,usecols=(0,1,3,4,5,6,7,11,42),comments='#',dtype=None,names=names)
+        except IOError:
+            print('IOERROR: AHF-ASCII file does not exist!')
+            print('Define par.files.halofile_in = "/path/to/file"')
+            exit()
+
+        #adopt units
+        h['x']    = h['x']/1000.0
+        h['y']    = h['y']/1000.0
+        h['z']    = h['z']/1000.0
+        h['rvir'] = h['rvir']/1000.0
+
+        #select haloes with Npart>Nmin
+        gID  = np.where(h['Nvir'] >= Nmin)
+        h = h[gID]
+        #select haloes with reasonable concentration
+        gID  = np.where(h['cvir'] > 0)
+        h = h[gID]
+        #select main haloes (only if ahf calculates host) 
+        gID  = np.where(h['IDhost'] < 0.0)
+        h = h[gID] 
+        print('Nhalo = ',len(h['Mvir']))
+
+    elif (halo_file_format=='ROCKSTAR-NPY'):
+        try:
+            h = np.load(halo_file_in)
+        except IOError:
+            print('IOERROR: ROCKSTAR-NPY file does not exist!')
+            print('Define par.files.halofile_in = "/path/to/file"')
+            exit()
+
+        h_dt = np.dtype([('halo_id', '<i8'), ('upid', '<i8'), ('x', '<f8'), ('y', '<f8'), 
+                         ('z', '<f8'), ('vx', '<f8'), ('vy', '<f8'), ('vz', '<f8'), 
+                         ('Mv', '<f8'), ('mpeak', '<f8'), ('vmp', '<f8'), ('r', '<f8'), 
+                         ('sm', '<f8'), ('icl', '<f8'), ('sfr', '<f8'), ('ssfr', '<f8'), 
+                         ('pid', '<f8'), ('Mvir', '<f8'), ('rvir', '<f8'), 
+                         ('rs_hlist', '<f8'), ('scale_half_mass', '<f8'), ('scale_last_mm', '<f8'), 
+                         ('m200b_hlist', '<f8'), ('m200c_hlist', '<f8'), ('gamma_inst', '<f8'), 
+                         ('gamma_100myr', '<f8'), ('gamma_1tdyn', '<f8'), ('gamma_2tdyn', '<f8'), 
+                         ('gamma_mpeak', '<f8'), ('vmax_mpeak', '<f8'), ('halo_hostid', '<i8'), 
+                         ('mhalo_host', '<f8'), ('mask_central', '?'), ('mtot_galaxy', '<f8'), 
+                         ('mstar_mhalo', '<f8'), ('logms_gal', '<f8'), ('logms_icl', '<f8'), 
+                         ('logms_tot', '<f8'), ('logms_halo', '<f8'), ('logmh_vir', '<f8'), 
+                         ('logmh_peak', '<f8'), ('logmh_host', '<f8')])
+        h = np.array(h,dtype=h_dt)
+        h = append_fields(h, 'cvir', h['rvir']/h['rs_hlist'])
+
+        print("WARNING: param.sim.Nmin_per_halo is not used.")
+        print("Dispalcement applied to all haloes.")
+
+        #select haloes with reasonable concentration
+        gID  = np.where(np.isfinite(h['cvir']))
+        h = h[gID]
+        #select main haloes (only if ahf calculates host)
+        gID  = np.where(h['upid'] < 0.0)
+        h = h[gID]
+
+        #select haloes with Mvir>2.5e11
+        gID  = np.where(h['Mvir'] >2.5e11)
+        h = h[gID]
+
+        print('Nhalo = ',len(h['Mvir']))
+
+        #adopt units
+        h['rvir'] = h['rvir']/1000
+        h['rs_hlist'] = h['rs_hlist']/1000
+        
+    else:
+        print('Unknown halo file format. Exit!')
+        exit()
+
+    #build buffer
+    rbuffer = param.code.rbuffer
+    ID = np.where((h['x']>(Lbox-rbuffer)) & (h['x']<=Lbox))
+    h  = np.append(h,h[ID])
+    if (len(ID[0])>0):
+        h['x'][-len(ID[0]):] = h['x'][-len(ID[0]):]-Lbox
+    ID = np.where((h['x']>0) & (h['x']<rbuffer))
+    h  = np.append(h,h[ID])
+    if (len(ID[0])>0):
+        h['x'][-len(ID[0]):] = h['x'][-len(ID[0]):]+Lbox
+    ID = np.where((h['y']>(Lbox-rbuffer)) & (h['y']<=Lbox))
+    h  = np.append(h,h[ID])
+    if (len(ID[0])>0):
+        h['y'][-len(ID[0]):] = h['y'][-len(ID[0]):]-Lbox
+    ID = np.where((h['y']>0) & (h['y']<rbuffer))
+    h  = np.append(h,h[ID])
+    if (len(ID[0])>0):
+        h['y'][-len(ID[0]):] = h['y'][-len(ID[0]):]+Lbox
+    ID = np.where((h['z']>(Lbox-rbuffer)) & (h['z']<=Lbox))
+    h  = np.append(h,h[ID])
+    if (len(ID[0])>0):
+        h['z'][-len(ID[0]):] = h['z'][-len(ID[0]):]-Lbox
+    ID = np.where((h['z']>0) & (h['z']<rbuffer))
+    h  = np.append(h,h[ID])
+    if (len(ID[0])>0):
+        h['z'][-len(ID[0]):] = h['z'][-len(ID[0]):]+Lbox
+
+    #separate into chunks
+    N_chunk = param.sim.N_chunk
+    L_chunk = Lbox/N_chunk
+    h_list = []
+    for x_min in np.linspace(0,Lbox-L_chunk,N_chunk):
+        x_max = x_min + L_chunk
+        for y_min in np.linspace(0,Lbox-L_chunk,N_chunk):
+            y_max =y_min + L_chunk
+            for z_min in np.linspace(0,Lbox-L_chunk,N_chunk):
+                z_max =z_min + L_chunk
+                ID = np.where((h['x']>=(x_min-rbuffer)) & (h['x']<(x_max+rbuffer)) & \
+                              (h['y']>=(y_min-rbuffer)) & (h['y']<(y_max+rbuffer)) & \
+                              (h['z']>=(z_min-rbuffer)) & (h['z']<(z_max+rbuffer)))
+                h_list += [h[ID]]
+    return h_list
+
+
+
+
+"""
+DISPLACEMENT FUNCTION
+"""
+
+def displ(rbin,MDMO,MDMB):
+
+    """
+    Calculates the displacement of all particles as a function
+    of the radial distance from the halo centre
+    """
+
+    MDMB_tck = splrep(rbin, MDMB, s=0, k=3)
+    MDMBinv_tck=splrep(MDMB, rbin, s=0, k=3)
+    rDMB = splev(MDMO,MDMBinv_tck,der=0)
+    DDMB = rDMB - rbin
+
+    return DDMB
+
+
+
+def worker(task):
+    p_chunk, h_chunk, p_header, param = task
+    return displace_chunk(p_chunk,h_chunk,p_header,param)
+
+
+def displace(param):
+
+    """
+    Reading in N-body and halo files, defining chunks, 
+    looping over haloes in single or multi-processor mode,
+    dispalcing particles, combining chunks, 
+    writing N-body file
+    """
+
+    #Read in N-body particle file and build chunks
+    p_list, p_header = read_nbody_file(param)
+
+    #Read in halo file, build chunks and buffer
+    h_list = read_halo_file(param)
+
+    #split work on cpus and perform displacement
+    N_chunk = param.sim.N_chunk
+    N_cpu   = int(N_chunk**3)
+    print('N_cpu = ',N_cpu)
+
+    if (N_cpu == 1):
+        p_displ = [displace_chunk(p_list[0],h_list[0],p_header,param)]
+
+    elif (N_cpu > 1):
+        pool = schwimmbad.choose_pool(mpi=False, processes=N_cpu)
+        tasks = list(zip(p_list,h_list,np.repeat(p_header,N_cpu),np.repeat(param,N_cpu)))
+        p_displ = pool.map(worker, tasks)
+        pool.close()
+
+    #combine chunks and write output
+    write_nbody_file(p_displ,p_header,param)
+
+
+
+def worker(task):
+
+    """
+    Worker for multi-processing
+    """
+
+    p_chunk, h_chunk, p_header, param = task
+
+    return displace_chunk(p_chunk,h_chunk,p_header,param)
+
+
+
+def displace_chunk(p_chunk,h_chunk,p_header,param):
+
+    """
+    Reading in N-body and halo files, looping over haloes, calculating
+    displacements, and dispalcing particles.
+    Combines functions displ_file() and displace_from_displ_file()
+    """
+
+    #relevant parameters
+    Mc   = param.baryon.Mc
+    mu   = param.baryon.mu
+    nu   = param.baryon.nu
+    thej = param.baryon.thej
+    Lbox = param.sim.Lbox
+
+    #Read cosmic variance/nu/correlation and interpolate
+    cosmofile = param.files.cosmofct
+    try:
+        vc_r, vc_m, vc_bias, vc_corr = np.loadtxt(cosmofile, usecols=(0,1,2,3), unpack=True)
+        bias_tck = splrep(vc_m, vc_bias, s=0)
+        corr_tck = splrep(vc_r, vc_corr, s=0)
+    except IOError:
+        print('IOERROR: Cosmofct file does not exist!')
+        print('Define par.files.cosmofct = "/path/to/file"')
+        print('Run: cosmo(params) to create file')
+        exit()
+
+    #Copy into p_temp
+    Dp_dt = np.dtype([("x",'>f'),("y",'>f'),("z",'>f')])
+    Dp    = np.zeros(len(p_chunk),dtype=Dp_dt)
+
+    #Build tree
+    print('building tree..')
+    p_tree = spatial.cKDTree(list(zip(p_chunk['x'],p_chunk['y'],p_chunk['z'])), leafsize=100)
+    print('...done!')
+
+    #Loop over haloes, calculate displacement, and displace partricles
+    for i in range(len(h_chunk['Mvir'])):
+
+        print('start: ', i)
+
+        #range where we consider displacement
+        rmax = param.code.rmax
+        rmin = (0.001*h_chunk['rvir'][i] if 0.001*h_chunk['rvir'][i]>param.code.rmin else param.code.rmin)
+        rmax = (20.0*h_chunk['rvir'][i] if 20.0*h_chunk['rvir'][i]<param.code.rmax else param.code.rmax)
+        rbin = np.logspace(np.log10(rmin),np.log10(rmax),100,base=10)
+
+        #calculate displacement
+        cosmo_bias = splev(h_chunk['Mvir'][i],bias_tck)
+        cosmo_corr = splev(rbin,corr_tck)
+        frac, dens, mass = profiles(rbin,h_chunk['Mvir'][i],h_chunk['cvir'][i],cosmo_corr,cosmo_bias,param)
+        DDMB = displ(rbin,mass['DMO'],mass['DMB'])
+        DDMB_tck = splrep(rbin, DDMB,s=0,k=3)
+
+        #define minimum displacement
+        smallestD = 0.01 #Mpc/h
+
+        #array of idx with D>Dsmallest
+        idx = np.where(abs(DDMB) > smallestD)
+        idx = idx[:][0]
+        if (len(idx)>1):
+            idx_largest = idx[-1]
+            rball = rbin[idx_largest]
+        else:
+            rball = 0.0
+
+        #consistency check:
+        print('rball/rvir = ', rball/h_chunk['rvir'][i])
+
+        print('Mvir, cvir = ', h_chunk['Mvir'][i], h_chunk['cvir'][i])
+        if (rball>Lbox/2.0):
+            print('rball = ', rball)
+            print('ERROR: REDUCE RBALL!')
+            exit()
+
+        #particle ids within rball
+        ipbool = p_tree.query_ball_point((h_chunk['x'][i],h_chunk['y'][i],h_chunk['z'][i]),rball)
+
+        #update displacement
+        rpDMB  = ((p_chunk['x'][ipbool]-h_chunk['x'][i])**2.0 + 
+                  (p_chunk['y'][ipbool]-h_chunk['y'][i])**2.0 + 
+                  (p_chunk['z'][ipbool]-h_chunk['z'][i])**2.0)**0.5
+
+        if (rball>0.0 and len(rpDMB)):
+            DrpDMB = splev(rpDMB,DDMB_tck,der=0,ext=1)
+            Dp['x'][ipbool] += (p_chunk['x'][ipbool]-h_chunk['x'][i])*DrpDMB/rpDMB
+            Dp['y'][ipbool] += (p_chunk['y'][ipbool]-h_chunk['y'][i])*DrpDMB/rpDMB
+            Dp['z'][ipbool] += (p_chunk['z'][ipbool]-h_chunk['z'][i])*DrpDMB/rpDMB
+
+    #displace particles
+    p_chunk['x'] += Dp['x']
+    p_chunk['y'] += Dp['y']
+    p_chunk['z'] += Dp['z']
+
+    return p_chunk
+
+
