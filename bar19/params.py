@@ -35,9 +35,9 @@ def baryon_par():
         "gamma": 2.0,     # index in gas profile [default: 2.0]
         "delta": 7.0,     # index in gas profile [default: 7.0 -> same asympt. behav. than NFWtrunc profile]  
         "rcga": 0.015,    # half-light radius of central galaxy (ratio to rvir)
-        "Nstar": 0.16,    # Stellar normalisation param [fstar = Nstar*(Mstar/Mvir)**eta], parameters from Moster+18, z=0.5
-        "Mstar": 10**(11.85+np.log10(.678)),  # Stellar critical mass [fstar = Nstar*(Mstar/Mvir)**eta]
-        "eta": .42,      # exponent of total stellar fraction [fstar = Nstar*(Mstar/Mvir)**eta]
+        "Nstar": 0.04,    # Stellar normalisation param [fstar = Nstar*(Mstar/Mvir)**eta], parameters from Moster+18, z=0.5
+        "Mstar": 2.5e11,  # Stellar critical mass [fstar = Nstar*(Mstar/Mvir)**eta]
+        "eta": .2,      # exponent of total stellar fraction [fstar = Nstar*(Mstar/Mvir)**eta]
         "deta": 0.2,     # exponent of central stellar fraction [fstar = Nstar*(Mstar/Mvir)**(eta+deta)]
         }
     return Bunch(par)
