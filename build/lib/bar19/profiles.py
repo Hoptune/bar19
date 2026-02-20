@@ -278,7 +278,7 @@ def profiles(rbin,Mvir,cvir,cosmo_corr,cosmo_bias,param):
     rho2h = (cosmo_bias*cosmo_corr + 1.0)*Om*RHOC #rho_b=const in comoving coord.
     rhoDMO = rhoNFW + rho2h
     MNFW   = MNFWtr_fct(rbin,cvir,tau,Mvir,param)
-    M2h    = cumulative_trapezoid(4.0*np.pi*rbin**2.0*rho2h,rbin,initial=rbin[0])
+    M2h    = cumulative_trapezoid(4.0*np.pi*rbin**2.0*rho2h,rbin,initial=.0)
     MDMO   = MNFW + M2h
 
     #Final density and mass profiles
@@ -288,7 +288,7 @@ def profiles(rbin,Mvir,cvir,cosmo_corr,cosmo_bias,param):
     R12      = param.baryon.rcga*rvir
     rho0CGA  = Mtot/(4.0*np.pi**(3.0/2.0)*R12)
     rhoCGA   = rho0CGA*uCGA_fct(rbin,Mvir,param)
-    MHGA     = cumulative_trapezoid(4.0*np.pi*rbin**2.0*rhoHGA,rbin,initial=rbin[0]) + M2h
+    MHGA     = cumulative_trapezoid(4.0*np.pi*rbin**2.0*rhoHGA,rbin,initial=.0) + M2h
     MCGA     = Mtot*MCGA_fct(rbin,Mvir,param) + M2h
     MHGA_tck = splrep(rbin, MHGA, s=0, k=3)
     MCGA_tck = splrep(rbin, MCGA, s=0, k=3)
