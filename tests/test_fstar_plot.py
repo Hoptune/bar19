@@ -65,6 +65,7 @@ class FstarPlotTests(unittest.TestCase):
         mhalo = np.logspace(11.0, 15.0, 128)
         fstar_central = self.profiles_mod.fSTAR_fct(mhalo, param, param.baryon.eta_high_cen)
         fstar_total = self.profiles_mod.fSTAR_fct(mhalo, param, param.baryon.eta_high_tot)
+        fstar_diff = fstar_total - fstar_central
 
         self.assertTrue(np.all(np.isfinite(fstar_central)))
         self.assertTrue(np.all(fstar_central > 0.0))
@@ -72,6 +73,8 @@ class FstarPlotTests(unittest.TestCase):
         self.assertTrue(np.all(np.isfinite(fstar_total)))
         self.assertTrue(np.all(fstar_total > 0.0))
         self.assertTrue(np.all(fstar_total < 1.0))
+        self.assertTrue(np.all(np.isfinite(fstar_diff)))
+        self.assertTrue(np.all(fstar_diff > 0.0))
 
         with tempfile.TemporaryDirectory() as tmpdir:
             outfile = Path(tmpdir) / "fstar_central_default.png"
@@ -79,6 +82,7 @@ class FstarPlotTests(unittest.TestCase):
             fig, ax = plt.subplots(figsize=(4.5, 4.5))
             ax.plot(mhalo, fstar_total, linewidth=2.0, label=r"$f_{\rm STAR}^{\rm tot}$")
             ax.plot(mhalo, fstar_central, linewidth=2.0, label=r"$f_{\rm STAR}^{\rm cen}$")
+            ax.plot(mhalo, fstar_diff, linewidth=2.0, label=r"$f_{\rm STAR}^{\rm tot}-f_{\rm STAR}^{\rm cen}$")
             ax.set_xscale("log")
             ax.set_yscale("log")
             ax.set_xlim(1.0e11, 1.0e15)
@@ -88,11 +92,13 @@ class FstarPlotTests(unittest.TestCase):
             fig.tight_layout()
             fig.savefig(outfile, dpi=120)
 
-            self.assertEqual(len(ax.lines), 2)
+            self.assertEqual(len(ax.lines), 3)
             np.testing.assert_allclose(ax.lines[0].get_xdata(), mhalo)
             np.testing.assert_allclose(ax.lines[0].get_ydata(), fstar_total)
             np.testing.assert_allclose(ax.lines[1].get_xdata(), mhalo)
             np.testing.assert_allclose(ax.lines[1].get_ydata(), fstar_central)
+            np.testing.assert_allclose(ax.lines[2].get_xdata(), mhalo)
+            np.testing.assert_allclose(ax.lines[2].get_ydata(), fstar_diff)
             self.assertTrue(outfile.exists())
             self.assertGreater(outfile.stat().st_size, 0)
 

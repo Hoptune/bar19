@@ -264,10 +264,7 @@ def profiles(rbin,Mvir,cvir,cosmo_corr,cosmo_bias,param):
     fcdm  = (Om-Ob)/Om
     fstar = fSTAR_fct(Mvir,param,eta_high_tot)*fbar
     fcga  = fSTAR_fct(Mvir,param,eta_high_cen)*fbar #Moster18
-    fsga  = fstar-fcga #satellites and intracluster light
-    if(fsga<0):
-        print('ERROR: negative fraction of satellite galaxies')
-        exit()
+    fsga  = np.maximum(fstar-fcga, 0.0) #satellites and intracluster light; floor at zero
     fhga  = fbar-fcga-fsga
 
     #total dark-matter-only mass

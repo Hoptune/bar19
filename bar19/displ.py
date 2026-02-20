@@ -63,6 +63,29 @@ def _is_master_process():
         return True
 
 
+def _write_par_to_hdf5(root, param):
+
+    """
+    Write parameter sections (except files) into an HDF5 file/group.
+    """
+
+    if param is None:
+        return
+    par_group = root.create_group('par')
+    for section_name in ('cosmo', 'baryon', 'code', 'sim'):
+        section = getattr(param, section_name, None)
+        if section is None:
+            continue
+        section_group = par_group.create_group(section_name)
+        for key, value in getattr(section, '__dict__', {}).items():
+            if key.startswith('_'):
+                continue
+            try:
+                section_group.create_dataset(key, data=np.asarray(value))
+            except Exception:
+                section_group.attrs[key] = str(value)
+
+
 def read_nbody_file(param):
 
     """
@@ -283,6 +306,7 @@ def write_nbody_file(p_list,p_header,param):
                 g_dm.create_dataset('x', data=p['x'].astype(np.float32))
                 g_dm.create_dataset('y', data=p['y'].astype(np.float32))
                 g_dm.create_dataset('z', data=p['z'].astype(np.float32))
+                _write_par_to_hdf5(f, param)
         except OSError:
             print('IOERROR: Cannot write HDF5 catalog output file!')
             print('Define par.files.partfile_out = "/path/to/output.hdf5"')
@@ -553,6 +577,7 @@ def write_halo_file(h_list, param):
             g_halo = f.create_group('halos')
             for field in h.dtype.names:
                 g_halo.create_dataset(field, data=np.asarray(h[field]))
+            _write_par_to_hdf5(f, param)
     except OSError:
         print('IOERROR: Cannot write HDF5 halo output file!')
         print('Define par.files.halofile_out = "/path/to/output_halos.hdf5"')

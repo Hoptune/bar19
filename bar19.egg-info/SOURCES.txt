@@ -16,3 +16,4 @@ bar19.egg-info/not-zip-safe
 bar19.egg-info/requires.txt
 bar19.egg-info/top_level.txt
 tests/test_chunking.py
+tests/test_fstar_plot.py
