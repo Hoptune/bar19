@@ -590,6 +590,13 @@ def write_halo_file(h_list, param):
             _, unique_idx = np.unique(h, return_index=True)
         h = h[np.sort(unique_idx)]
 
+    lbox = getattr(getattr(param, 'sim', None), 'Lbox', None)
+    if (lbox is not None) and (float(lbox) > 0.0) and (h.dtype.names is not None):
+        lbox = float(lbox)
+        for axis in ('x', 'y', 'z'):
+            if axis in h.dtype.names:
+                h[axis] = np.mod(h[axis], lbox)
+
     halo_file_out = getattr(param.files, 'halofile_out', None)
     if halo_file_out is None:
         part_out = getattr(param.files, 'partfile_out', 'partfile_out.hdf5')
