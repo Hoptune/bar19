@@ -2,6 +2,7 @@ __pycache__/
 *__pycache__*
 *.pyc
 build/
+*.ipynb_checkpoint*
 
 # Nutstore sync artifacts
 .nutstore/
