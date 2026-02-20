@@ -318,7 +318,7 @@ def profiles(rbin,Mvir,cvir,cosmo_corr,cosmo_bias,param):
 
     #define dictionaries
     frac = { 'CDM':fcdm, 'CGA':fcga, 'SGA':fsga, 'HGA':fhga }
-    dens = { 'NFW':rhoNFW, 'BG':rho2h, 'DMO':rhoDMO, 'ACM':rhoACM, 'CGA':rhoCGA, 'HGA':rhoHGA, 'DMB':rhoDMB }
+    dens = { 'NFW':rhoNFW, 'BG':rho2h, 'DMO':rhoDMO, 'ACM':rhoACM, 'CGA':rhoCGA, 'HGA':rhoHGA, 'DMB':rhoDMB , 'BAR':rhoBAR }
     mass = { 'NFW':MNFW, 'BG':M2h, 'DMO':MDMO, 'ACM':(fcdm+fsga)*MACM, 'CGA':fcga*MCGA, 'HGA':fhga*MHGA, 'DMB':MDMB }
     return frac, dens, mass
 
