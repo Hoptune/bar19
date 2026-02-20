@@ -237,11 +237,11 @@ def write_nbody_file(p_list,p_header,param):
     #print(type(p))
     #print(p['x'][0])
     #correct for periodic boundaries
-    p['x'][p['x']>Lbox] -= Lbox
+    p['x'][p['x']>=Lbox] -= Lbox
     p['x'][p['x']<0.0]  += Lbox
-    p['y'][p['y']>Lbox] -= Lbox
+    p['y'][p['y']>=Lbox] -= Lbox
     p['y'][p['y']<0.0]  += Lbox
-    p['z'][p['z']>Lbox] -= Lbox
+    p['z'][p['z']>=Lbox] -= Lbox
     p['z'][p['z']<0.0]  += Lbox
 
     #write output
@@ -708,7 +708,7 @@ def displace_chunk(p_chunk,h_chunk,p_header,param):
         DDMB_tck = splrep(rbin, DDMB,s=0,k=3)
         if (param.code.return_bcmmass):
             enc_dens_ov_rhocrit = mass['DMB'] / rhoc_of_z(param) / (4*np.pi/3.0*rbin**3)
-            M_deltaout = 10**np.interp(param.sim.deltavir, enc_dens_ov_rhocrit, np.log10(mass['DMB']), left=-np.inf, right=np.inf)
+            M_deltaout = 10**np.interp(param.sim.deltavir, enc_dens_ov_rhocrit[::-1], np.log10(mass['DMB'])[::-1], left=np.inf, right=-np.inf)
             h_chunk['Mvir_bcm'][i] = M_deltaout
 
         #define minimum displacement
