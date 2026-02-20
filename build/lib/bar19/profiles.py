@@ -44,7 +44,7 @@ def rvir_fct(rvir,c,deltavir):
 
 def M500_fct(Mvir,c,deltavir):
     """
-    From Mvir to M500 assuming a NFW profiles
+    From M200 to M500 assuming a NFW profiles
     """
     f = lambda y: np.log(1.0+c*y) - c*y/(1.0+c*y) - 500./deltavir*(np.log(1.0+c)-c/(1.0+c))*y**3.0
     y0 = fsolve(f,1.0)
@@ -68,22 +68,23 @@ def M500_fct(Mvir,c,deltavir):
 STELLAR FRACTIONS
 """
 
-# def fSTAR_fct(Mvir,param,eta=0.3):
-#     NN = param.baryon.Nstar
-#     M1 = param.baryon.Mstar
-#     return NN/(Mvir/M1)**(eta)
+def fSTAR_fct(Mvir,param,eta=0.3):
+    NN = param.baryon.Nstar
+    M1 = param.baryon.Mstar
+    return NN/(Mvir/M1)**(eta)
 
 
-def fSTAR_fct(Mvir,param,eta_high):
-   """
-   Total stellar fraction (central and satellite galaxies).
-   Free model parameter eta.
-   (Function inspired by Moster+2018, Eq.5)
-   """
-   NN = param.baryon.Nstar
-   M1 = param.baryon.Mstar
-   eta_low = param.baryon.eta_low
-   return 2*NN*((Mvir/M1)**(-eta_low)+(Mvir/M1)**(eta_high))**(-1.0)
+#def fSTAR_fct(Mvir,eta):
+#    """
+#    Total stellar fraction (central and satellite galaxies).
+#    Free model parameter eta.
+#    (Function inspired by Moster+2013, Eq.2)
+#    """
+#    NN = 0.0351
+#    M1 = 10.0**11.4351/0.704
+#    zeta = 1.376
+#    return 2*NN*((Mvir/M1)**(-zeta)+(Mvir/M1)**(eta))**(-1.0)
+
 
 
 """
@@ -247,23 +248,21 @@ def profiles(rbin,Mvir,cvir,cosmo_corr,cosmo_bias,param):
     Om      = param.cosmo.Om
     Ob      = param.cosmo.Ob
     eps     = param.code.eps
-    # eta     = param.baryon.eta
-    # deta    = param.baryon.deta
-    eta_high_cen = param.baryon.eta_high_cen
-    eta_high_tot = param.baryon.eta_high_tot
+    eta     = param.baryon.eta
+    deta    = param.baryon.deta
     
     #radii
     tau  = eps*cvir
     rvir = (3.0*Mvir/(4.0*np.pi*param.sim.deltavir*rhoc_of_z(param)))**(1.0/3.0)
-    # r500 = r500_fct(rvir, cvir, param.sim.deltavir)
-    # M500 = MNFW_fct(r500,cvir,Mvir,param)
+    r500 = r500_fct(rvir, cvir, param.sim.deltavir)
+    M500 = MNFW_fct(r500,cvir,Mvir,param)
     #M500 = MNFWtr_fct(r500,cvir,tau,Mvir,param)
 
     #total fractions
     fbar  = Ob/Om
     fcdm  = (Om-Ob)/Om
-    fstar = fSTAR_fct(Mvir,param,eta_high_tot)*fbar
-    fcga  = fSTAR_fct(Mvir,param,eta_high_cen)*fbar #Moster18
+    fstar = fSTAR_fct(Mvir,param,eta)
+    fcga  = fSTAR_fct(Mvir,param,eta+deta) #Moster13
     fsga  = fstar-fcga #satellites and intracluster light
     if(fsga<0):
         print('ERROR: negative fraction of satellite galaxies')
@@ -317,11 +316,11 @@ def profiles(rbin,Mvir,cvir,cosmo_corr,cosmo_bias,param):
     rhoBAR   = (fcdm+fsga)*rhoACM + fhga*rhoHGA + fcga*rhoCGA
     rhoDMB   = rhoBAR + rho2h
     MDMB     = (fcdm+fsga)*MACM + fhga*MHGA + fcga*MCGA
-    # MDMB_tck = splrep(rbin, MDMB, s=0, k=3)
-    # MDMBinv_tck = splrep(MDMB, rbin, s=0, k=3)
+    MDMB_tck = splrep(rbin, MDMB, s=0, k=3)
+    MDMBinv_tck = splrep(MDMB, rbin, s=0, k=3)
 
     #define dictionaries
     frac = { 'CDM':fcdm, 'CGA':fcga, 'SGA':fsga, 'HGA':fhga }
-    dens = { 'NFW':rhoNFW, 'BG':rho2h, 'DMO':rhoDMO, 'ACM':rhoACM, 'CGA':rhoCGA, 'HGA':rhoHGA, 'DMB':rhoDMB , 'BAR':rhoBAR }
+    dens = { 'NFW':rhoNFW, 'BG':rho2h, 'DMO':rhoDMO, 'ACM':rhoACM, 'CGA':rhoCGA, 'HGA':rhoHGA, 'DMB':rhoDMB }
     mass = { 'NFW':MNFW, 'BG':M2h, 'DMO':MDMO, 'ACM':(fcdm+fsga)*MACM, 'CGA':fcga*MCGA, 'HGA':fhga*MHGA, 'DMB':MDMB }
     return frac, dens, mass

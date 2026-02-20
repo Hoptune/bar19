@@ -1,10 +1,8 @@
-Metadata-Version: 1.0
+Metadata-Version: 2.1
 Name: bar19
 Version: 0.1
 Summary: Correcting N-body outputs to account for baryon effects
 Home-page: https://bitbucket.org/aurel..
 Author: Aurel Schneider
 Author-email: schneider.duhem@gmail.com
-License: UNKNOWN
-Description: UNKNOWN
-Platform: UNKNOWN
+Requires-Dist: schwimmbad
