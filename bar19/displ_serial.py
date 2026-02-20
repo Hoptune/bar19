@@ -8,8 +8,15 @@ from __future__ import print_function
 from __future__ import division
 
 import numpy as np
+import os
+import multiprocessing
 from scipy import spatial
 from scipy.interpolate import splrep,splev
+
+try:
+    from tqdm.auto import tqdm
+except ImportError:
+    tqdm = None
 
 
 from .params import par
@@ -19,6 +26,35 @@ from .profiles import *
 """
 READING/WRITING FILES
 """
+
+def _is_master_process():
+    """
+    Only render progress bars from the main process and MPI rank 0.
+    """
+    mpi_rank_vars = (
+        'OMPI_COMM_WORLD_RANK',
+        'PMI_RANK',
+        'PMIX_RANK',
+        'MV2_COMM_WORLD_RANK',
+        'SLURM_PROCID',
+    )
+    for var in mpi_rank_vars:
+        rank = os.environ.get(var)
+        if (rank is not None) and (rank != '') and (rank != '0'):
+            return False
+    try:
+        return multiprocessing.current_process().name == 'MainProcess'
+    except Exception:
+        return True
+
+
+def _progress(iterable, total=None, desc=None, disable=False):
+    """
+    Wrap iterables with a progress bar when tqdm is available.
+    """
+    if disable or (tqdm is None) or (not _is_master_process()):
+        return iterable
+    return tqdm(iterable, total=total, desc=desc, leave=False)
 
 def read_nbody_file(param):
     """
@@ -450,8 +486,9 @@ def displace_from_displ_file(param):
     print('...done!')
 
     #Loop over haloes and displace
-    for k in range(len(h['Mvir'])):
-        print('start: ', k)
+    n_halo = len(h['Mvir'])
+    for k in _progress(range(n_halo), total=n_halo, desc='Displacing halos',
+                       disable=(n_halo <= 1)):
         #find displacement function from D_array (no interpolation for the moment)
         idx_Mvir = abs(Mvir-h['Mvir'][k]).argmin()
         idx_cvir = abs(cvir[idx_Mvir]-h['cvir'][k]).argmin()
@@ -468,8 +505,6 @@ def displace_from_displ_file(param):
         else:
             rball = 0.0
         #consistency check:
-        print('rball = ', rball)
-        print('Mvir, cvir = ', h['Mvir'][k], h['cvir'][k])
         if (rball>Lbox/2.0):
             print('rball = ', rball)
             print('ERROR: REDUCE RBALL!')
@@ -548,8 +583,9 @@ def displace(param):
     print('...done!')
 
     #Loop over haloes, calculate displacement, and displace partricles
-    for i in range(len(h['Mvir'])):
-        print('start: ', i)
+    n_halo = len(h['Mvir'])
+    for i in _progress(range(n_halo), total=n_halo, desc='Displacing halos',
+                       disable=(n_halo <= 1)):
         #range where we consider displacement
         rmax = param.code.rmax
         rmin = (0.001*h['rvir'][i] if 0.001*h['rvir'][i]>param.code.rmin else param.code.rmin)
@@ -572,9 +608,6 @@ def displace(param):
         else:
             rball = 0.0
         #consistency check:
-        print('rball/rvir = ', rball/h['rvir'][i])
-
-        print('Mvir, cvir = ', h['Mvir'][i], h['cvir'][i], h['Nvir'][i])
         if (rball>Lbox/2.0):
             print('rball = ', rball)
             print('ERROR: REDUCE RBALL!')
@@ -590,7 +623,6 @@ def displace(param):
         hhx = h['x'][ihbool]
         hhy = h['y'][ihbool]
         hhz = h['z'][ihbool]
-        print('Nb of haloes in rball = ', len(hhx))
         #displace particles
         rpDMB  = ((phx-h['x'][i])**2.0 + (phy-h['y'][i])**2.0 + (phz-h['z'][i])**2.0)**0.5
         if (rball>0.0 and len(rpDMB)):
@@ -682,8 +714,9 @@ def displace_allinone(param):
     print('...done!')
 
     #Loop over haloes, calculate displacement, and displace partricles
-    for i in range(len(h['Mvir'])):
-        print('start: ', i)
+    n_halo = len(h['Mvir'])
+    for i in _progress(range(n_halo), total=n_halo, desc='Displacing halos',
+                       disable=(n_halo <= 1)):
         #range where we consider displacement
         rmax = param.code.rmax
         rmin = (0.001*h['rvir'][i] if 0.001*h['rvir'][i]>param.code.rmin else param.code.rmin)
@@ -706,9 +739,6 @@ def displace_allinone(param):
         else:
             rball = 0.0
         #consistency check:
-        print('rball/rvir = ', rball/h['rvir'][i])
-
-        print('Mvir, cvir = ', h['Mvir'][i], h['cvir'][i], h['Nvir'][i])
         if (rball>Lbox/2.0):
             print('rball = ', rball)
             print('ERROR: REDUCE RBALL!')
@@ -804,8 +834,9 @@ def displace_components(param):
     print('...done!')
 
     #Loop over haloes, calculate displacement, and displace partricles
-    for i in range(len(h['Mvir'])):
-        print('start: ', i)
+    n_halo = len(h['Mvir'])
+    for i in _progress(range(n_halo), total=n_halo, desc='Displacing halos',
+                       disable=(n_halo <= 1)):
         #range where we consider displacement
         rmax = param.code.rmax
         rmin = (0.001*h['rvir'][i] if 0.001*h['rvir'][i]>param.code.rmin else param.code.rmin)
@@ -849,13 +880,11 @@ def displace_components(param):
         ipHGA  = ipbool[np.where(ipbool < nHGA)]
         ipNGA  = ipbool[np.where(ipbool >= nHGA)]
         #update displacement
-        print('Nb of comp:', len(ipHGA), len(ipNGA), h['Nvir'][i])
         if (rball>0.0 and len(ipHGA)>0 and len(ipNGA)>0):
             rpHGA  = ((p['x'][ipHGA]-h['x'][i])**2.0 + (p['y'][ipHGA]-h['y'][i])**2.0 + (p['z'][ipHGA]-h['z'][i])**2.0)**0.5
             rpNGA  = ((p['x'][ipNGA]-h['x'][i])**2.0 + (p['y'][ipNGA]-h['y'][i])**2.0 + (p['z'][ipNGA]-h['z'][i])**2.0)**0.5
             DrpHGA = splev(rpHGA,DHGA_tck,der=0,ext=1)
             DrpNGA = splev(rpNGA,DNGA_tck,der=0,ext=1)
-            print('Max D(r) = ', max(DrpHGA), max(DrpNGA))
             Dp['x'][ipHGA] += (p['x'][ipHGA]-h['x'][i])*DrpHGA/rpHGA
             Dp['y'][ipHGA] += (p['y'][ipHGA]-h['y'][i])*DrpHGA/rpHGA
             Dp['z'][ipHGA] += (p['z'][ipHGA]-h['z'][i])*DrpHGA/rpHGA

@@ -9,6 +9,7 @@ PRINT INFORMATION INTO TEMPORARY FILE
 
 import numpy as np
 import os
+import multiprocessing
 from scipy import spatial
 from scipy.interpolate import splrep,splev
 from numpy.lib.recfunctions import append_fields
@@ -33,9 +34,33 @@ def _progress(iterable, total=None, desc=None, disable=False):
     Wrap iterables with a progress bar when tqdm is available.
     """
 
-    if disable or (tqdm is None):
+    if disable or (tqdm is None) or (not _is_master_process()):
         return iterable
     return tqdm(iterable, total=total, desc=desc, leave=False)
+
+
+def _is_master_process():
+
+    """
+    Only render progress bars from the main process and MPI rank 0.
+    """
+
+    mpi_rank_vars = (
+        'OMPI_COMM_WORLD_RANK',
+        'PMI_RANK',
+        'PMIX_RANK',
+        'MV2_COMM_WORLD_RANK',
+        'SLURM_PROCID',
+    )
+    for var in mpi_rank_vars:
+        rank = os.environ.get(var)
+        if (rank is not None) and (rank != '') and (rank != '0'):
+            return False
+
+    try:
+        return multiprocessing.current_process().name == 'MainProcess'
+    except Exception:
+        return True
 
 
 def read_nbody_file(param):
@@ -558,15 +583,6 @@ def displ(rbin,MDMO,MDMB):
 
 
 
-def worker(task):
-    if len(task) == 5:
-        chunk_id, p_chunk, h_chunk, p_header, param = task
-        p_displ, h_displ = displace_chunk(p_chunk,h_chunk,p_header,param)
-        return chunk_id, p_displ, h_displ
-    p_chunk, h_chunk, p_header, param = task
-    return displace_chunk(p_chunk,h_chunk,p_header,param)
-
-
 def displace(param):
 
     """
@@ -674,9 +690,9 @@ def displace_chunk(p_chunk,h_chunk,p_header,param):
     print('...done!')
 
     #Loop over haloes, calculate displacement, and displace partricles
-    for i in range(len(h_chunk['Mvir'])):
-
-        print('start: ', i)
+    n_halo = len(h_chunk['Mvir'])
+    for i in _progress(range(n_halo), total=n_halo, desc='Displacing halos',
+                       disable=(n_halo <= 1)):
 
         #range where we consider displacement
         rmax = param.code.rmax
@@ -708,9 +724,6 @@ def displace_chunk(p_chunk,h_chunk,p_header,param):
             rball = 0.0
 
         #consistency check:
-        print('rball/rvir = ', rball/h_chunk['rvir'][i])
-
-        print('Mvir, cvir = ', h_chunk['Mvir'][i], h_chunk['cvir'][i])
         if (rball>Lbox/2.0):
             print('rball = ', rball)
             print('ERROR: REDUCE RBALL!')
