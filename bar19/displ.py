@@ -339,6 +339,8 @@ def read_halo_file(param):
         #select main haloes (only if ahf calculates host) 
         gID  = np.where(h['IDhost'] < 0.0)
         h = h[gID] 
+        # Keep a consistent host field name across all halo formats.
+        h = append_fields(h, 'hostID', np.asarray(h['IDhost'], dtype=np.int64), usemask=False)
         print('Nhalo = ',len(h['Mvir']))
 
     elif (halo_file_format=='ROCKSTAR-NPY'):
@@ -378,6 +380,14 @@ def read_halo_file(param):
         gID  = np.where(h['Mvir'] >= Mhalo_min)
         h = h[gID]
 
+        # Keep consistent identifiers across all halo formats.
+        h = append_fields(
+            h,
+            ['ID', 'hostID'],
+            [np.asarray(h['halo_id'], dtype=np.int64), np.asarray(h['upid'], dtype=np.int64)],
+            usemask=False,
+        )
+
         print('Nhalo = ',len(h['Mvir']))
 
         #adopt units
@@ -401,24 +411,39 @@ def read_halo_file(param):
                 Mvir = np.asarray(g['Mvir'])
                 rvir = np.asarray(g['rvir'])
                 cvir = np.asarray(g['cvir'])
-                if 'IDhost' in g:
+                if 'ID' in g:
+                    halo_id = np.asarray(g['ID'])
+                elif 'halo_id' in g:
+                    halo_id = np.asarray(g['halo_id'])
+                else:
+                    halo_id = np.arange(len(x), dtype=np.int64)
+                if 'hostID' in g:
+                    host_id = np.asarray(g['hostID'])
+                    has_host_id = True
+                elif 'IDhost' in g:
                     host_id = np.asarray(g['IDhost'])
+                    has_host_id = True
                 elif 'upid' in g:
                     host_id = np.asarray(g['upid'])
+                    has_host_id = True
                 else:
-                    host_id = None
+                    host_id = np.full(len(x), -1, dtype=np.int64)
+                    has_host_id = False
         except (OSError, KeyError):
             print('IOERROR: Cannot read HDF5 halo catalog with required datasets.')
             print('Define par.files.halofile_in = "/path/to/halos.hdf5"')
             exit()
 
-        if any(len(arr) != len(x) for arr in (y, z, Mvir, rvir, cvir)):
+        if any(len(arr) != len(x) for arr in (y, z, Mvir, rvir, cvir, halo_id, host_id)):
             print('IOERROR: HDF5 halo datasets must have identical lengths.')
             exit()
 
-        h_dt = np.dtype([('Mvir', '<f8'), ('x', '<f8'), ('y', '<f8'), ('z', '<f8'),
+        h_dt = np.dtype([('ID', '<i8'), ('hostID', '<i8'), ('Mvir', '<f8'),
+                         ('x', '<f8'), ('y', '<f8'), ('z', '<f8'),
                          ('rvir', '<f8'), ('cvir', '<f8')])
         h = np.zeros(len(x), dtype=h_dt)
+        h['ID'] = np.asarray(halo_id, dtype=np.int64)
+        h['hostID'] = np.asarray(host_id, dtype=np.int64)
         h['x'] = x
         h['y'] = y
         h['z'] = z
@@ -435,12 +460,11 @@ def read_halo_file(param):
         gID  = np.where(h['cvir'] > 0)
         h = h[gID]
         #select main haloes when a host id is provided
-        if host_id is not None:
-            host_id = host_id[gID]
-            gID  = np.where(host_id < 0.0)
+        if has_host_id:
+            gID  = np.where(h['hostID'] < 0.0)
             h = h[gID]
         else:
-            print('WARNING: HDF5 halo catalog has no IDhost/upid. Keeping all haloes.')
+            print('WARNING: HDF5 halo catalog has no hostID/IDhost/upid. Keeping all haloes.')
 
         print('Nhalo = ',len(h['Mvir']))
 
@@ -518,11 +542,12 @@ def write_halo_file(h_list, param):
     if isinstance(h_list, (list, tuple)):
         if len(h_list) == 0:
             print('WARNING: Empty halo list. Writing empty halo catalog.')
-            h = np.zeros(
-                0,
-                dtype=[('Mvir', '<f8'), ('x', '<f8'), ('y', '<f8'), ('z', '<f8'),
-                       ('rvir', '<f8'), ('cvir', '<f8'), ('Mvir_bcm', '<f8')],
-            )
+            empty_dtype = [('ID', '<i8'), ('hostID', '<i8'), ('Mvir', '<f8'),
+                           ('x', '<f8'), ('y', '<f8'), ('z', '<f8'),
+                           ('rvir', '<f8'), ('cvir', '<f8')]
+            if getattr(param.code, 'return_bcmmass', False):
+                empty_dtype.append(('Mvir_bcm', '<f8'))
+            h = np.zeros(0, dtype=empty_dtype)
         else:
             h = np.concatenate(h_list)
     else:
@@ -532,9 +557,13 @@ def write_halo_file(h_list, param):
         print('IOERROR: Halo output must be a structured array.')
         exit()
 
-    # Chunks overlap by a buffer; remove duplicate rows and keep first-seen order.
+    # Chunks overlap by a buffer; remove repeated halos by ID and keep first-seen order.
     if len(h) > 0:
-        _, unique_idx = np.unique(h, return_index=True)
+        if 'ID' in h.dtype.names:
+            _, unique_idx = np.unique(h['ID'], return_index=True)
+        else:
+            print('WARNING: Halo output has no ID field. Falling back to full-row deduplication.')
+            _, unique_idx = np.unique(h, return_index=True)
         h = h[np.sort(unique_idx)]
 
     halo_file_out = getattr(param.files, 'halofile_out', None)
