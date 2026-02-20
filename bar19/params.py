@@ -64,7 +64,7 @@ def code_par():
         "rmax": 50.0,
         "rbuffer": 10.0, # buffer size to take care of boundary conditions
         "eps": 4.0,      # truncation factor: eps=rtr/rvir 
-        "beta_model": 0, # 0: old model from Schneider+18 1: new model
+        "beta_model": 1, # 0: old model from Schneider+18 1: new model
         "return_bcmmass": True
         }
     return Bunch(par)

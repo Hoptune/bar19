@@ -254,8 +254,8 @@ def profiles(rbin,Mvir,cvir,cosmo_corr,cosmo_bias,param):
     #radii
     tau  = eps*cvir
     rvir = (3.0*Mvir/(4.0*np.pi*param.sim.deltavir*rhoc_of_z(param)))**(1.0/3.0)
-    r500 = r500_fct(rvir, cvir, param.sim.deltavir)
-    M500 = MNFW_fct(r500,cvir,Mvir,param)
+    # r500 = r500_fct(rvir, cvir, param.sim.deltavir)
+    # M500 = MNFW_fct(r500,cvir,Mvir,param)
     #M500 = MNFWtr_fct(r500,cvir,tau,Mvir,param)
 
     #total fractions
@@ -316,8 +316,8 @@ def profiles(rbin,Mvir,cvir,cosmo_corr,cosmo_bias,param):
     rhoBAR   = (fcdm+fsga)*rhoACM + fhga*rhoHGA + fcga*rhoCGA
     rhoDMB   = rhoBAR + rho2h
     MDMB     = (fcdm+fsga)*MACM + fhga*MHGA + fcga*MCGA
-    MDMB_tck = splrep(rbin, MDMB, s=0, k=3)
-    MDMBinv_tck = splrep(MDMB, rbin, s=0, k=3)
+    # MDMB_tck = splrep(rbin, MDMB, s=0, k=3)
+    # MDMBinv_tck = splrep(MDMB, rbin, s=0, k=3)
 
     #define dictionaries
     frac = { 'CDM':fcdm, 'CGA':fcga, 'SGA':fsga, 'HGA':fhga }
