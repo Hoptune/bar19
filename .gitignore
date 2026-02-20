@@ -1,1 +1,9 @@
+__pycache__/
+*__pycache__*
 *.pyc
+
+# Nutstore sync artifacts
+.nutstore/
+.nutstore*
+*.nutstore
+
