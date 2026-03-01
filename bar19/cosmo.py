@@ -265,10 +265,9 @@ def cosmo(param):
         exit()
 
     try:
-        bin_corr = np.array([correlation_halofit(rr, z, colossus_cosmo, param) for rr in bin_r])
+        bin_corr = colossus_cosmo.correlationFunction(bin_r, z=z)
     except Exception:
-        print('ERROR: unable to evaluate matter correlation with Colossus.')
-        print('Check corr_model and optional ps_model settings.')
+        print('ERROR: unable to evaluate linear matter correlation with Colossus.')
         exit()
 
     bin_bias = np.asarray(bin_bias)
