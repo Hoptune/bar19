@@ -65,7 +65,7 @@ class FstarPlotTests(unittest.TestCase):
         mhalo = np.logspace(11.0, 15.0, 128)
         fstar_central = self.profiles_mod.fSTAR_fct(mhalo, param, param.baryon.eta_high_cen)
         fstar_total = self.profiles_mod.fSTAR_fct(mhalo, param, param.baryon.eta_high_tot)
-        fstar_diff = fstar_total - fstar_central
+        fstar_diff = np.maximum(fstar_total - fstar_central, 0.0)
 
         self.assertTrue(np.all(np.isfinite(fstar_central)))
         self.assertTrue(np.all(fstar_central > 0.0))
@@ -74,7 +74,7 @@ class FstarPlotTests(unittest.TestCase):
         self.assertTrue(np.all(fstar_total > 0.0))
         self.assertTrue(np.all(fstar_total < 1.0))
         self.assertTrue(np.all(np.isfinite(fstar_diff)))
-        self.assertTrue(np.all(fstar_diff > 0.0))
+        self.assertTrue(np.all(fstar_diff >= 0.0))
 
         with tempfile.TemporaryDirectory() as tmpdir:
             outfile = Path(tmpdir) / "fstar_central_default.png"

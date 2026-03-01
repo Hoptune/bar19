@@ -45,8 +45,8 @@ def baryon_par():
 
 def io_files():
     par = {
-        "transfct": 'CDM_PLANCK_tk.dat',
-        "cosmofct": 'cosmofct.dat',
+        # "transfct": 'CDM_PLANCK_tk.dat',
+        # "cosmofct": 'cosmofct.dat',
         # "displfct": 'displfct.dat',
         "partfile_in": 'partfile_in.std',
         "partfile_out": 'partfile_out.std',
