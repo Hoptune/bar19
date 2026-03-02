@@ -255,7 +255,7 @@ def cosmo(param):
         print('Check Om, Ob, h0, ns, s8 and optional colossus_params.')
         exit()
 
-    bias_model = 'tinker10'
+    bias_model = getattr(param.code, 'bias_model', 'tinker10')
     bias_mdef = f'{param.sim.deltavir:.0f}c'
     try:
         bin_bias = colossus_bias.haloBias(bin_m, z=z, model=bias_model, mdef=bias_mdef)
