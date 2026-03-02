@@ -45,8 +45,8 @@ def baryon_par():
 
 def io_files():
     par = {
-        "transfct": 'CDM_PLANCK_tk.dat',
-        "cosmofct": 'cosmofct.dat',
+        # "transfct": 'CDM_PLANCK_tk.dat',
+        # "cosmofct": 'cosmofct.dat',
         # "displfct": 'displfct.dat',
         "partfile_in": 'partfile_in.std',
         "partfile_out": 'partfile_out.std',
@@ -65,7 +65,9 @@ def code_par():
         "rmax": 50.0,
         "rbuffer": 10.0, # buffer size to take care of boundary conditions
         "eps": 4.0,      # truncation factor: eps=rtr/rvir 
+        "deltavir": 200.0, # overdensity of halos relative to critical density
         "beta_model": 1, # 0: old model from Schneider+18 1: new model
+        'bias_model': 'bhattacharya11', # bias model for halo bias (e.g. bhattacharya11, tinker10)
         "return_bcmmass": True
         }
     return Bunch(par)
@@ -76,7 +78,6 @@ def sim_par():
         "rbuffer": 10.0, #buffer size to take care of boundary conditions
         "Mhalo_min": 2.5e11, # minimum halo mass
         "N_chunk": 1,     #number of chunks (for multiprocesser: n_core = N_chunk^3)
-        "deltavir": 200.0, # overdensity relative to critical density
         }
     return Bunch(par)
 
