@@ -94,7 +94,7 @@ def uNFWtr_fct(rbin,cvir,t,Mvir,param):
     """
     Truncated NFW density profile. Normalised.
     """
-
+    
     rvir = (3.0*Mvir/(4.0*np.pi*param.sim.deltavir*rhoc_of_z(param)))**(1.0/3.0)
     x = cvir*rbin/rvir
     return 1.0/(x * (1.0+x)**2.0 * (1.0+x**2.0/t**2.0)**2.0)

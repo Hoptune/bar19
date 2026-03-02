@@ -6,6 +6,10 @@ Home-page: https://bitbucket.org/aurel..
 Author: Aurel Schneider
 Author-email: schneider.duhem@gmail.com
 Requires-Dist: schwimmbad
+Requires-Dist: colossus
+Requires-Dist: astropy
+Requires-Dist: numpy
+Requires-Dist: scipy
 Dynamic: author
 Dynamic: author-email
 Dynamic: home-page
