@@ -23,6 +23,7 @@ except ImportError:
 #from .params import par
 from .constants import *
 from .profiles import *
+from .cosmo import cosmo
 
 """
 READING/WRITING FILES
@@ -729,17 +730,21 @@ def displace_chunk(p_chunk,h_chunk,p_header,param):
     thej = param.baryon.thej
     Lbox = param.sim.Lbox
 
-    #Read cosmic variance/nu/correlation and interpolate
-    cosmofile = param.files.cosmofct
-    try:
-        vc_r, vc_m, vc_bias, vc_corr = np.loadtxt(cosmofile, usecols=(0,1,2,3), unpack=True)
-        bias_tck = splrep(vc_m, vc_bias, s=0)
-        corr_tck = splrep(vc_r, vc_corr, s=0)
-    except IOError:
-        print('IOERROR: Cosmofct file does not exist!')
-        print('Define par.files.cosmofct = "/path/to/file"')
-        print('Run: cosmo(params) to create file')
-        exit()
+    # #Read cosmic variance/nu/correlation and interpolate
+    # cosmofile = param.files.cosmofct
+    # try:
+    #     vc_r, vc_m, vc_bias, vc_corr = np.loadtxt(cosmofile, usecols=(0,1,2,3), unpack=True)
+    #     bias_tck = splrep(vc_m, vc_bias, s=0)
+    #     corr_tck = splrep(vc_r, vc_corr, s=0)
+    # except IOError:
+    #     print('IOERROR: Cosmofct file does not exist!')
+    #     print('Define par.files.cosmofct = "/path/to/file"')
+    #     print('Run: cosmo(params) to create file')
+    #     exit()
+
+    vc_r, vc_m, vc_bias, vc_corr = cosmo(param)
+    bias_tck = splrep(vc_m, vc_bias, s=0)
+    corr_tck = splrep(vc_r, vc_corr, s=0)
 
     #Copy into p_temp
     Dp_dt = np.dtype([("x",'>f'),("y",'>f'),("z",'>f')])

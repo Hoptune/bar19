@@ -15,7 +15,7 @@ setup(name='bar19',
       author='Aurel Schneider',
       author_email='schneider.duhem@gmail.com',
       install_requires=[
-          'schwimmbad',
+          'schwimmbad', 'colossus', 'astropy', 'numpy', 'scipy'
       ],
       packages=['bar19'],
       zip_safe=False)
