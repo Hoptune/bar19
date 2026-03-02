@@ -256,7 +256,7 @@ def cosmo(param):
         exit()
 
     bias_model = getattr(param.code, 'bias_model', 'tinker10')
-    bias_mdef = f'{param.sim.deltavir:.0f}c'
+    bias_mdef = f'{param.code.deltavir:.0f}c'
     try:
         bin_bias = colossus_bias.haloBias(bin_m, z=z, model=bias_model, mdef=bias_mdef)
     except Exception:
