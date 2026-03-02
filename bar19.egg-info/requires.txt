@@ -1,5 +1,0 @@
-schwimmbad
-colossus
-astropy
-numpy
-scipy
