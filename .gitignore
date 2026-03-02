@@ -3,6 +3,7 @@ __pycache__/
 *.pyc
 build/
 *.ipynb_checkpoint*
+bar19.egg-info/
 
 # Nutstore sync artifacts
 .nutstore/
